@@ -104,7 +104,6 @@ func makeStore(name, ns string, v *addon.Vault) *esv1alpha1.SecretStore {
 			Provider: &esv1alpha1.SecretStoreProvider{
 				Vault: &esv1alpha1.VaultProvider{
 					Version:  esv1alpha1.VaultKVStoreV2,
-					Parser:   esv1alpha1.VaultParserKv,
 					Path:     "secret",
 					Server:   v.VaultURL,
 					CABundle: v.VaultServerCA,
@@ -217,7 +216,6 @@ func (s vaultProvider) CreateV1Store(v *addon.Vault, ns string) {
 	Expect(err).ToNot(HaveOccurred())
 	secretStore := makeStore(kvv1ProviderName, ns, v)
 	secretStore.Spec.Provider.Vault.Version = esv1alpha1.VaultKVStoreV1
-	secretStore.Spec.Provider.Vault.Parser = esv1alpha1.VaultParserKv
 	secretStore.Spec.Provider.Vault.Path = "secret_v1"
 	secretStore.Spec.Provider.Vault.Auth = esv1alpha1.VaultAuth{
 		TokenSecretRef: &esmeta.SecretKeySelector{

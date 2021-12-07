@@ -53,6 +53,14 @@ type ExternalSecretTemplateMetadata struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
+// ExternalSecretTemplateVersion defines version of template.
+type ExternalSecretTemplateVersion string
+
+const (
+	ExternalSecretTemplateVersionV1 ExternalSecretTemplateVersion = "v1"
+	ExternalSecretTemplateVersionV2 ExternalSecretTemplateVersion = "v2"
+)
+
 // ExternalSecretTemplate defines a blueprint for the created Secret resource.
 // we can not use native corev1.Secret, it will have empty ObjectMeta values: https://github.com/kubernetes-sigs/controller-tools/issues/448
 type ExternalSecretTemplate struct {
@@ -61,6 +69,17 @@ type ExternalSecretTemplate struct {
 
 	// +optional
 	Metadata ExternalSecretTemplateMetadata `json:"metadata,omitempty"`
+
+	// Version defines version of template.
+	// v1 By default data passed to template eg.: {"key": "value"} value is []bytes type and no nested objects support.
+	// v2 By default data passed to template eg.: {"key": "value"} value is string type.
+	// Additionally, in v2 nested objects is supported {"key": "value": {"ab": "cd"}}.
+	// Defaults to 'v1'
+	// +optional
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum="v1";"v2"
+	// +kubebuilder:default:="v1"
+	Version ExternalSecretTemplateVersion `json:"version,omitempty"`
 
 	// +optional
 	Data map[string]string `json:"data,omitempty"`

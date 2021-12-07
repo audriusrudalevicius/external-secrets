@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -54,9 +53,6 @@ const (
 	errAuthFormat     = "cannot initialize Vault client: no valid auth method specified: %w"
 	errDataField      = "failed to find data field"
 	errJSONUnmarshall = "failed to unmarshall JSON"
-	errSecretFormat   = "secret data not in expected format"
-	errSecretParserV2 = "secret data failed to be converted to json"
-	errUnknownParser  = "unknown parser selected"
 	errVaultToken     = "cannot parse Vault authentication token: %w"
 	errVaultReqParams = "cannot set Vault request parameters: %w"
 	errVaultRequest   = "error from Vault request: %w"
@@ -76,8 +72,6 @@ const (
 	errVaultRevokeToken = "error while revoking token: %w"
 
 	errUnknownCAProvider = "unknown caProvider type given"
-
-	stringParserDataPath = "data"
 )
 
 type Client interface {
@@ -151,13 +145,13 @@ func (c *connector) NewClient(ctx context.Context, store esv1alpha1.GenericStore
 	return vStore, nil
 }
 
-func (v *client) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) ([]byte, error) {
+func (v *client) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (interface{}, error) {
 	data, err := v.readSecret(ctx, ref.Key, ref.Version)
 	if err != nil {
 		return nil, err
 	}
-	if ref.Property == "" && v.store.Parser == esv1alpha1.VaultParserKv {
-		return data[stringParserDataPath], nil
+	if ref.Property == "" { //todo add testcase
+		return data, nil
 	}
 	value, exists := data[ref.Property]
 	if !exists {
@@ -166,7 +160,7 @@ func (v *client) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDat
 	return value, nil
 }
 
-func (v *client) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string][]byte, error) {
+func (v *client) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string]interface{}, error) {
 	return v.readSecret(ctx, ref.Key, ref.Version)
 }
 
@@ -183,7 +177,7 @@ func (v *client) Close(ctx context.Context) error {
 	return nil
 }
 
-func (v *client) readSecret(ctx context.Context, path, version string) (map[string][]byte, error) {
+func (v *client) readSecret(ctx context.Context, path, version string) (map[string]interface{}, error) {
 	kvPath := v.store.Path
 
 	if v.store.Version == esv1alpha1.VaultKVStoreV2 {
@@ -225,32 +219,7 @@ func (v *client) readSecret(ctx context.Context, path, version string) (map[stri
 		}
 	}
 
-	switch v.store.Parser {
-	case esv1alpha1.VaultParserString:
-		byteMap := make(map[string][]byte, 1)
-		byteMap[stringParserDataPath], err = json.Marshal(secretData)
-		if err != nil {
-			return nil, errors.New(errSecretParserV2)
-		}
-		return byteMap, nil
-	case esv1alpha1.VaultParserKv:
-		byteMap := make(map[string][]byte, len(secretData))
-		for k, v := range secretData {
-			switch t := v.(type) {
-			case string:
-				byteMap[k] = []byte(t)
-			case []byte:
-				byteMap[k] = t
-			case nil:
-				byteMap[k] = []byte(nil)
-			default:
-				return nil, errors.New(errSecretFormat)
-			}
-		}
-		return byteMap, nil
-	default:
-		return nil, errors.New(errUnknownParser)
-	}
+	return secretData, nil
 }
 
 func (v *client) newConfig() (*vault.Config, error) {

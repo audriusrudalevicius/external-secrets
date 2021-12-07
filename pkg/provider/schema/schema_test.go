@@ -34,13 +34,13 @@ func (p *PP) NewClient(ctx context.Context, store esv1alpha1.GenericStore, kube 
 }
 
 // GetSecret returns a single secret from the provider.
-func (p *PP) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) ([]byte, error) {
+func (p *PP) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (interface{}, error) {
 	return []byte("NOOP"), nil
 }
 
 // GetSecretMap returns multiple k/v pairs from the provider.
-func (p *PP) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string][]byte, error) {
-	return map[string][]byte{}, nil
+func (p *PP) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string]interface{}, error) {
+	return map[string]interface{}{}, nil
 }
 
 func (p *PP) Close(ctx context.Context) error {

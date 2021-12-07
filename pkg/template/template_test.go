@@ -135,7 +135,7 @@ func TestExecute(t *testing.T) {
 	tbl := []struct {
 		name        string
 		tpl         map[string][]byte
-		data        map[string][]byte
+		data        map[string]interface{}
 		expetedData map[string][]byte
 		expErr      string
 	}{
@@ -149,7 +149,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"foo": []byte("{{ .secret | base64decode | toString }}"),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte("MTIzNA=="),
 			},
 			expetedData: map[string][]byte{
@@ -161,8 +161,8 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"foo": []byte("{{ $var := .secret | fromJSON }}{{ $var.foo }}"),
 			},
-			data: map[string][]byte{
-				"secret": []byte(`{"foo": "bar"}`),
+			data: map[string]interface{}{
+				"secret": `{"foo": "bar"}`,
 			},
 			expetedData: map[string][]byte{
 				"foo": []byte("bar"),
@@ -173,7 +173,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"foo": []byte("{{ $var := .secret | fromJSON }}{{ $var.foo | toJSON }}"),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte(`{"foo": {"baz":"bang"}}`),
 			},
 			expetedData: map[string][]byte{
@@ -192,7 +192,7 @@ func TestExecute(t *testing.T) {
 			password: "{{ .password | toString }}"
 			user: "{{ .user | toString }}"`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"user":     []byte(`foobert`),
 				"password": []byte("harharhar"),
 			},
@@ -212,7 +212,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"foo": []byte(`{{ "123412341234" | toBytes | base64encode | base64decode | toString }}`),
 			},
-			data: map[string][]byte{},
+			data: map[string]interface{}{},
 			expetedData: map[string][]byte{
 				"foo": []byte("123412341234"),
 			},
@@ -223,7 +223,7 @@ func TestExecute(t *testing.T) {
 				"key":  []byte(`{{ .secret | base64decode | pkcs12key | pemPrivateKey }}`),
 				"cert": []byte(`{{ .secret | base64decode | pkcs12cert | pemCertificate }}`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte(pkcs12ContentNoPass),
 			},
 			expetedData: map[string][]byte{
@@ -237,7 +237,7 @@ func TestExecute(t *testing.T) {
 				"key":  []byte(`{{ .secret | base64decode | pkcs12keyPass "123456" | pemPrivateKey }}`),
 				"cert": []byte(`{{ .secret | base64decode | pkcs12certPass "123456" | pemCertificate }}`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte(pkcs12ContentWithPass),
 			},
 			expetedData: map[string][]byte{
@@ -250,7 +250,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"key": []byte(`{{ .example | base64decode }}`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"example": []byte("iam_no_base64"),
 			},
 			expErr: "unable to decode base64",
@@ -260,7 +260,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"key": []byte(`{{ .secret | base64decode | pkcs12keyPass "wrong" | pemPrivateKey }}`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte(pkcs12ContentWithPass),
 			},
 			expErr: "unable to decode pkcs12",
@@ -270,7 +270,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"cert": []byte(`{{ .secret | base64decode | pkcs12certPass "wrong" | pemCertificate }}`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte(pkcs12ContentWithPass),
 			},
 			expErr: "unable to decode pkcs12",
@@ -280,7 +280,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"key": []byte(`{{ "{ # no json # }" | toBytes | fromJSON }}`),
 			},
-			data:   map[string][]byte{},
+			data:   map[string]interface{}{},
 			expErr: "unable to unmarshal json",
 		},
 		{
@@ -288,7 +288,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"key": []byte(`{{ #xx }}`),
 			},
-			data:   map[string][]byte{},
+			data:   map[string]interface{}{},
 			expErr: "unable to parse template",
 		},
 		{
@@ -296,7 +296,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"fn": []byte(`{{ .secret | jwkPublicKeyPem }}`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte(jwkPubRSA),
 			},
 			expetedData: map[string][]byte{
@@ -308,7 +308,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"fn": []byte(`{{ .secret | jwkPrivateKeyPem }}`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte(jwkPrivRSA),
 			},
 			expetedData: map[string][]byte{
@@ -320,7 +320,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"fn": []byte(`{{ .secret | jwkPublicKeyPem }}`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte(jwkPubEC),
 			},
 			expetedData: map[string][]byte{
@@ -332,7 +332,7 @@ func TestExecute(t *testing.T) {
 			tpl: map[string][]byte{
 				"fn": []byte(`{{ .secret | jwkPrivateKeyPem }}`),
 			},
-			data: map[string][]byte{
+			data: map[string]interface{}{
 				"secret": []byte(jwkPrivEC),
 			},
 			expetedData: map[string][]byte{

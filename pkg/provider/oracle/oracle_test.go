@@ -14,7 +14,7 @@ package oracle
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 
@@ -32,9 +32,9 @@ type vaultTestCase struct {
 	ref            *esv1alpha1.ExternalSecretDataRemoteRef
 	apiErr         error
 	expectError    string
-	expectedSecret string
+	expectedSecret interface{}
 	// for testing secretmap
-	expectedData map[string][]byte
+	expectedData map[string]interface{}
 }
 
 func makeValidVaultTestCase() *vaultTestCase {
@@ -45,8 +45,8 @@ func makeValidVaultTestCase() *vaultTestCase {
 		apiOutput:      makeValidAPIOutput(),
 		apiErr:         nil,
 		expectError:    "",
-		expectedSecret: "",
-		expectedData:   map[string][]byte{},
+		expectedSecret: nil,
+		expectedData:   nil,
 	}
 	smtc.mockClient.WithValue(*smtc.apiInput, *smtc.apiOutput, smtc.apiErr)
 	return &smtc
@@ -106,7 +106,7 @@ func TestOracleVaultGetSecret(t *testing.T) {
 				SecretName:    utilpointer.StringPtr("changedvalue"),
 			},
 		}
-		smtc.expectedSecret = secretValue
+		smtc.expectedSecret = []byte(secretValue)
 	}
 
 	successCases := []*vaultTestCase{
@@ -123,9 +123,7 @@ func TestOracleVaultGetSecret(t *testing.T) {
 		if !ErrorContains(err, v.expectError) {
 			t.Errorf("[%d] unexpected error: %s, expected: '%s'", k, err.Error(), v.expectError)
 		}
-		if string(out) != v.expectedSecret {
-			t.Errorf("[%d] unexpected secret: expected %s, got %s", k, v.expectedSecret, string(out))
-		}
+		assert.Exactly(t, v.expectedSecret, out, "unexpected secret")
 	}
 }
 
@@ -133,7 +131,9 @@ func TestGetSecretMap(t *testing.T) {
 	// good case: default version & deserialization
 	setDeserialization := func(smtc *vaultTestCase) {
 		smtc.apiOutput.SecretName = utilpointer.StringPtr(`{"foo":"bar"}`)
-		smtc.expectedData["foo"] = []byte("bar")
+		smtc.expectedData = map[string]interface{}{
+			"foo": []byte("bar"),
+		}
 	}
 
 	// bad case: invalid json
@@ -156,9 +156,7 @@ func TestGetSecretMap(t *testing.T) {
 		if !ErrorContains(err, v.expectError) {
 			t.Errorf("[%d] unexpected error: %s, expected: '%s'", k, err.Error(), v.expectError)
 		}
-		if err == nil && !reflect.DeepEqual(out, v.expectedData) {
-			t.Errorf("[%d] unexpected secret data: expected %#v, got %#v", k, v.expectedData, out)
-		}
+		assert.Exactly(t, v.expectedData, out, "unexpected secret")
 	}
 }
 

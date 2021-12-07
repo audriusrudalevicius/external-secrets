@@ -17,6 +17,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/external-secrets/external-secrets/pkg/serializer"
 	"strings"
 
 	"github.com/IBM/go-sdk-core/v5/core"
@@ -92,7 +93,7 @@ func (c *client) setAuth(ctx context.Context) error {
 	return nil
 }
 
-func (ibm *providerIBM) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) ([]byte, error) {
+func (ibm *providerIBM) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (interface{}, error) {
 	if utils.IsNil(ibm.IBMClient) {
 		return nil, fmt.Errorf(errUninitalizedIBMProvider)
 	}
@@ -204,7 +205,15 @@ func getUsernamePasswordSecret(ibm *providerIBM, secretName *string, ref esv1alp
 	return nil, fmt.Errorf("key %s does not exist in secret %s", ref.Property, ref.Key)
 }
 
-func (ibm *providerIBM) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string][]byte, error) {
+func (ibm *providerIBM) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string]interface{}, error) {
+	val, err := ibm.readSecretMap(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return serializer.BackwardCompatabilityFix(val), nil
+}
+
+func (ibm *providerIBM) readSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string]interface{}, error) {
 	if utils.IsNil(ibm.IBMClient) {
 		return nil, fmt.Errorf(errUninitalizedIBMProvider)
 	}
@@ -239,9 +248,7 @@ func (ibm *providerIBM) GetSecretMap(ctx context.Context, ref esv1alpha1.Externa
 			return nil, fmt.Errorf(errJSONSecretUnmarshal, err)
 		}
 
-		secretMap := byteArrayMap(kv)
-
-		return secretMap, nil
+		return kv, nil
 
 	case sm.CreateSecretOptionsSecretTypeUsernamePasswordConst:
 		response, _, err := ibm.IBMClient.GetSecret(
@@ -256,9 +263,7 @@ func (ibm *providerIBM) GetSecretMap(ctx context.Context, ref esv1alpha1.Externa
 		secret := response.Resources[0].(*sm.SecretResource)
 		secretData := secret.SecretData.(map[string]interface{})
 
-		secretMap := byteArrayMap(secretData)
-
-		return secretMap, nil
+		return secretData, nil
 
 	case sm.CreateSecretOptionsSecretTypeIamCredentialsConst:
 		response, _, err := ibm.IBMClient.GetSecret(
@@ -273,7 +278,7 @@ func (ibm *providerIBM) GetSecretMap(ctx context.Context, ref esv1alpha1.Externa
 		secret := response.Resources[0].(*sm.SecretResource)
 		secretData := *secret.APIKey
 
-		secretMap := make(map[string][]byte)
+		secretMap := make(map[string]interface{})
 		secretMap["apikey"] = []byte(secretData)
 
 		return secretMap, nil
@@ -291,21 +296,11 @@ func (ibm *providerIBM) GetSecretMap(ctx context.Context, ref esv1alpha1.Externa
 		secret := response.Resources[0].(*sm.SecretResource)
 		secretData := secret.SecretData.(map[string]interface{})
 
-		secretMap := byteArrayMap(secretData)
-
-		return secretMap, nil
+		return secretData, nil
 
 	default:
 		return nil, fmt.Errorf("unknown secret type %s", secretType)
 	}
-}
-
-func byteArrayMap(secretData map[string]interface{}) map[string][]byte {
-	secretMap := make(map[string][]byte)
-	for k, v := range secretData {
-		secretMap[k] = []byte(v.(string))
-	}
-	return secretMap
 }
 
 func (ibm *providerIBM) Close(ctx context.Context) error {

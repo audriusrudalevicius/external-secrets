@@ -52,7 +52,6 @@ func makeValidSecretStoreWithVersion(v esv1alpha1.VaultKVStoreVersion) *esv1alph
 				Vault: &esv1alpha1.VaultProvider{
 					Server:  "vault.example.com",
 					Path:    "secret",
-					Parser:  esv1alpha1.VaultParserKv,
 					Version: v,
 					Auth: esv1alpha1.VaultAuth{
 						Kubernetes: &esv1alpha1.VaultKubernetesAuth{
@@ -73,12 +72,6 @@ func makeValidSecretStore() *esv1alpha1.SecretStore {
 	return makeValidSecretStoreWithVersion(esv1alpha1.VaultKVStoreV2)
 }
 
-func makeValidSecretStoreStringParser() *esv1alpha1.SecretStore {
-	var store = makeValidSecretStoreWithVersion(esv1alpha1.VaultKVStoreV2)
-	store.Spec.Provider.Vault.Parser = esv1alpha1.VaultParserString
-	return store
-}
-
 func makeValidSecretStoreWithCerts() *esv1alpha1.SecretStore {
 	return &esv1alpha1.SecretStore{
 		ObjectMeta: metav1.ObjectMeta{
@@ -90,7 +83,6 @@ func makeValidSecretStoreWithCerts() *esv1alpha1.SecretStore {
 				Vault: &esv1alpha1.VaultProvider{
 					Server:  "vault.example.com",
 					Path:    "secret",
-					Parser:  esv1alpha1.VaultParserKv,
 					Version: esv1alpha1.VaultKVStoreV2,
 					Auth: esv1alpha1.VaultAuth{
 						Cert: &esv1alpha1.VaultCertAuth{
@@ -586,25 +578,6 @@ func TestGetSecretMap(t *testing.T) {
 			reason: "Should map the secret even if it has a nil value",
 			args: args{
 				store: makeValidSecretStoreWithVersion(esv1alpha1.VaultKVStoreV2).Spec.Provider.Vault,
-				vClient: &fake.VaultClient{
-					MockNewRequest: fake.NewMockNewRequestFn(&vault.Request{}),
-					MockRawRequestWithContext: fake.NewMockRawRequestWithContextFn(
-						newVaultResponseWithData(
-							map[string]interface{}{
-								"data": complexVal,
-							},
-						), nil,
-					),
-				},
-			},
-			want: want{
-				err: fmt.Errorf(errSecretFormat),
-			},
-		},
-		"ReadSecretComplexParserJson": {
-			reason: "Should map the secret even if it has a nil value",
-			args: args{
-				store: makeValidSecretStoreStringParser().Spec.Provider.Vault,
 				vClient: &fake.VaultClient{
 					MockNewRequest: fake.NewMockNewRequestFn(&vault.Request{}),
 					MockRawRequestWithContext: fake.NewMockRawRequestWithContextFn(

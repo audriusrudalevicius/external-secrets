@@ -22,8 +22,8 @@ import (
 	"reflect"
 )
 
-// MergeByteMap merges map of byte slices.
-func MergeByteMap(dst, src map[string][]byte) map[string][]byte {
+// MergeInterfaceMap merges map of interfaces slices.
+func MergeInterfaceMap(dst, src map[string]interface{}) map[string]interface{} {
 	for k, v := range src {
 		dst[k] = v
 	}

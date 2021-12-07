@@ -64,6 +64,7 @@ const (
 	errGetSecretKey          = "key %q from ExternalSecret %q: %w"
 	errTplCMMissingKey       = "error in configmap %s: missing key %s"
 	errTplSecMissingKey      = "error in secret %s: missing key %s"
+	errSerialisation         = "error in data serialisation: %w"
 )
 
 // Reconciler reconciles a ExternalSecret object.
@@ -384,8 +385,8 @@ func (r *Reconciler) getStore(ctx context.Context, externalSecret *esv1alpha1.Ex
 }
 
 // getProviderSecretData returns the provider's secret data with the provided ExternalSecret.
-func (r *Reconciler) getProviderSecretData(ctx context.Context, providerClient provider.SecretsClient, externalSecret *esv1alpha1.ExternalSecret) (map[string][]byte, error) {
-	providerData := make(map[string][]byte)
+func (r *Reconciler) getProviderSecretData(ctx context.Context, providerClient provider.SecretsClient, externalSecret *esv1alpha1.ExternalSecret) (map[string]interface{}, error) {
+	providerData := make(map[string]interface{})
 
 	for _, remoteRef := range externalSecret.Spec.DataFrom {
 		secretMap, err := providerClient.GetSecretMap(ctx, remoteRef)
@@ -393,7 +394,7 @@ func (r *Reconciler) getProviderSecretData(ctx context.Context, providerClient p
 			return nil, fmt.Errorf(errGetSecretKey, remoteRef.Key, externalSecret.Name, err)
 		}
 
-		providerData = utils.MergeByteMap(providerData, secretMap)
+		providerData = utils.MergeInterfaceMap(providerData, secretMap)
 	}
 
 	for _, secretRef := range externalSecret.Spec.Data {

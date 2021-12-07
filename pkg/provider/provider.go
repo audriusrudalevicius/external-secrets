@@ -31,9 +31,9 @@ type Provider interface {
 // SecretsClient provides access to secrets.
 type SecretsClient interface {
 	// GetSecret returns a single secret from the provider
-	GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) ([]byte, error)
+	GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (interface{}, error)
 
 	// GetSecretMap returns multiple k/v pairs from the provider
-	GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string][]byte, error)
+	GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string]interface{}, error)
 	Close(ctx context.Context) error
 }

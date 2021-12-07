@@ -18,13 +18,6 @@ import (
 	esmeta "github.com/external-secrets/external-secrets/apis/meta/v1"
 )
 
-type VaultParser string
-
-const (
-	VaultParserKv     VaultParser = "key-value"
-	VaultParserString VaultParser = "string"
-)
-
 type VaultKVStoreVersion string
 
 const (
@@ -39,7 +32,7 @@ const (
 	CAProviderTypeConfigMap CAProviderType = "ConfigMap"
 )
 
-// Defines a location to fetch the cert for the vault provider from.
+// CAProvider Defines a location to fetch the cert for the vault provider from.
 type CAProvider struct {
 	// The type of provider to use such as "Secret", or "ConfigMap".
 	// +kubebuilder:validation:Enum="Secret";"ConfigMap"
@@ -57,7 +50,7 @@ type CAProvider struct {
 	Namespace string `json:"namespace"`
 }
 
-// Configures an store to sync secrets using a HashiCorp Vault
+// VaultProvider Configures an store to sync secrets using a HashiCorp Vault
 // KV backend.
 type VaultProvider struct {
 	// Auth configures how secret-manager authenticates with the Vault server.
@@ -78,13 +71,6 @@ type VaultProvider struct {
 	// +kubebuilder:validation:Enum="v1";"v2"
 	// +kubebuilder:default:="v2"
 	Version VaultKVStoreVersion `json:"version"`
-
-	// Parser defines how backend data is interpreted by engine.
-	// Parser defaults to "key-value".
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum="key-value";"string"
-	// +kubebuilder:default:="key-value"
-	Parser VaultParser `json:"parser,omitempty"`
 
 	// Name of the vault namespace. Namespaces is a set of features within Vault Enterprise that allows
 	// Vault environments to support Secure Multi-tenancy. e.g: "ns1".
@@ -157,7 +143,7 @@ type VaultAppRole struct {
 	SecretRef esmeta.SecretKeySelector `json:"secretRef"`
 }
 
-// Authenticate against Vault using a Kubernetes ServiceAccount token stored in
+// VaultKubernetesAuth Authenticate against Vault using a Kubernetes ServiceAccount token stored in
 // a Secret.
 type VaultKubernetesAuth struct {
 	// Path where the Kubernetes authentication backend is mounted in Vault, e.g:
@@ -210,7 +196,7 @@ type VaultJwtAuth struct {
 	SecretRef esmeta.SecretKeySelector `json:"secretRef,omitempty"`
 }
 
-// VaultJwtAuth authenticates with Vault using the JWT/OIDC authentication
+// VaultCertAuth authenticates with Vault using the JWT/OIDC authentication
 // method, with the role name and token stored in a Kubernetes Secret resource.
 type VaultCertAuth struct {
 	// ClientCert is a certificate to authenticate using the Cert Vault

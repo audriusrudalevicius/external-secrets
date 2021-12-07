@@ -16,7 +16,7 @@ package ibm
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 
@@ -36,9 +36,9 @@ type secretManagerTestCase struct {
 	serviceURL     *string
 	apiErr         error
 	expectError    string
-	expectedSecret string
+	expectedSecret interface{}
 	// for testing secretmap
-	expectedData map[string][]byte
+	expectedData map[string]interface{}
 }
 
 func makeValidSecretManagerTestCase() *secretManagerTestCase {
@@ -50,8 +50,8 @@ func makeValidSecretManagerTestCase() *secretManagerTestCase {
 		serviceURL:     nil,
 		apiErr:         nil,
 		expectError:    "",
-		expectedSecret: "",
-		expectedData:   map[string][]byte{},
+		expectedSecret: nil,
+		expectedData:   nil,
 	}
 	smtc.mockClient.WithValue(smtc.apiInput, smtc.apiOutput, smtc.apiErr)
 	return &smtc
@@ -247,9 +247,7 @@ func TestIBMSecretManagerGetSecret(t *testing.T) {
 		if !ErrorContains(err, v.expectError) {
 			t.Errorf("[%d] unexpected error: %s, expected: '%s'", k, err.Error(), v.expectError)
 		}
-		if string(out) != v.expectedSecret {
-			t.Errorf("[%d] unexpected secret: expected %s, got %s", k, v.expectedSecret, string(out))
-		}
+		assert.Exactly(t, v.expectedSecret, out)
 	}
 }
 
@@ -274,7 +272,7 @@ func TestGetSecretMap(t *testing.T) {
 			}}
 
 		smtc.apiOutput.Resources = resources
-		smtc.expectedData["foo"] = []byte("bar")
+		smtc.expectedData = map[string]interface{}{"foo": "bar"}
 	}
 
 	// bad case: invalid json
@@ -308,8 +306,10 @@ func TestGetSecretMap(t *testing.T) {
 		smtc.apiInput.SecretType = core.StringPtr(sm.CreateSecretOptionsSecretTypeUsernamePasswordConst)
 		smtc.apiOutput.Resources = resources
 		smtc.ref.Key = "username_password/test-secret"
-		smtc.expectedData["username"] = []byte(secretUsername)
-		smtc.expectedData["password"] = []byte(secretPassword)
+		smtc.expectedData = map[string]interface{}{
+			"username": secretUsername,
+			"password": secretPassword,
+		}
 	}
 
 	// good case: iam_credentials
@@ -324,7 +324,9 @@ func TestGetSecretMap(t *testing.T) {
 		smtc.apiInput.SecretType = core.StringPtr(sm.CreateSecretOptionsSecretTypeIamCredentialsConst)
 		smtc.apiOutput.Resources = resources
 		smtc.ref.Key = "iam_credentials/test-secret"
-		smtc.expectedData["apikey"] = []byte(secretAPIKey)
+		smtc.expectedData = map[string]interface{}{
+			"apikey": secretAPIKey,
+		}
 	}
 
 	// good case: imported_cert
@@ -344,9 +346,12 @@ func TestGetSecretMap(t *testing.T) {
 		smtc.apiInput.SecretType = core.StringPtr(sm.CreateSecretOptionsSecretTypeImportedCertConst)
 		smtc.apiOutput.Resources = resources
 		smtc.ref.Key = "imported_cert/test-secret"
-		smtc.expectedData["certificate"] = []byte(secretCertificate)
-		smtc.expectedData["private_key"] = []byte(secretPrivateKey)
-		smtc.expectedData["intermediate"] = []byte(secretIntermediate)
+
+		smtc.expectedData = map[string]interface{}{
+			"certificate":  secretCertificate,
+			"private_key":  secretPrivateKey,
+			"intermediate": secretIntermediate,
+		}
 	}
 
 	successCases := []*secretManagerTestCase{
@@ -366,9 +371,7 @@ func TestGetSecretMap(t *testing.T) {
 		if !ErrorContains(err, v.expectError) {
 			t.Errorf("[%d] unexpected error: %s, expected: '%s'", k, err.Error(), v.expectError)
 		}
-		if err == nil && !reflect.DeepEqual(out, v.expectedData) {
-			t.Errorf("[%d] unexpected secret data: expected %#v, got %#v", k, v.expectedData, out)
-		}
+		assert.Exactly(t, v.expectedData, out)
 	}
 }
 

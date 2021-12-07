@@ -11,6 +11,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package template
 
 import (
@@ -19,7 +20,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"github.com/external-secrets/external-secrets/apis/externalsecrets/v1alpha1"
 	"strings"
 	tpl "text/template"
 
@@ -51,6 +54,16 @@ var tplFuncs = tpl.FuncMap{
 	"lower":    strings.ToLower,
 }
 
+// Version Defines version and format for template.
+// v1 Has data as key/value map[string][]byte
+// v2 Has data as map[string]interface{} and enables nested structures. But brakes backwards compatibility.
+type Version = string
+
+const (
+	VersionV1 Version = "v1"
+	VersionV2 Version = "v2"
+)
+
 const (
 	errParse                = "unable to parse template at key %s: %s"
 	errExecute              = "unable to execute template at key %s: %s"
@@ -62,36 +75,57 @@ const (
 	errDecodeBase64         = "unable to decode base64: %s"
 	errUnmarshalJSON        = "unable to unmarshal json: %s"
 	errMarshalJSON          = "unable to marshal json: %s"
+	errUnknownVersion       = "unknown template version"
 )
 
 // Execute renders the secret data as template. If an error occurs processing is stopped immediately.
-func Execute(tpl, data map[string][]byte, secret *corev1.Secret) error {
+func Execute(tpl map[string][]byte, data map[string]interface{}, secret *corev1.Secret, version v1alpha1.ExternalSecretTemplateVersion) error {
 	if tpl == nil {
 		return nil
 	}
-	for k, v := range tpl {
-		val, err := execute(k, string(v), data)
+	switch version {
+	case VersionV1:
+		v1data := make(map[string][]byte, len(data))
+		for k, v := range data {
+			v1data[k] = []byte(fmt.Sprintf("%v", v))
+		}
+		err := templatesExecute(tpl, v1data, secret)
+		if err != nil {
+			return err
+		}
+	case VersionV2:
+		err := templatesExecute(tpl, data, secret)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New(errUnknownVersion)
+	}
+
+	return nil
+}
+
+func templatesExecute(templates map[string][]byte, data interface{}, secret *corev1.Secret) error {
+	for k, v := range templates {
+		t, err := prepareTemplate(k, string(v))
+		buf := bytes.NewBuffer(nil)
+		err = t.Execute(buf, data)
 		if err != nil {
 			return fmt.Errorf(errExecute, k, err)
 		}
-		secret.Data[k] = val
+		secret.Data[k] = buf.Bytes()
 	}
 	return nil
 }
 
-func execute(k, val string, data map[string][]byte) ([]byte, error) {
+func prepareTemplate(k, val string) (*tpl.Template, error) {
 	t, err := tpl.New(k).
 		Funcs(tplFuncs).
 		Parse(val)
 	if err != nil {
 		return nil, fmt.Errorf(errParse, k, err)
 	}
-	buf := bytes.NewBuffer(nil)
-	err = t.Execute(buf, data)
-	if err != nil {
-		return nil, fmt.Errorf(errExecute, k, err)
-	}
-	return buf.Bytes(), nil
+	return t, nil
 }
 
 func pkcs12keyPass(pass string, input []byte) ([]byte, error) {

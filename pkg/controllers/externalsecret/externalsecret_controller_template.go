@@ -17,6 +17,8 @@ package externalsecret
 import (
 	"context"
 	"fmt"
+	"github.com/external-secrets/external-secrets/pkg/serializer"
+	"github.com/external-secrets/external-secrets/pkg/template"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,7 +28,6 @@ import (
 
 	// Loading registered providers.
 	_ "github.com/external-secrets/external-secrets/pkg/provider/register"
-	"github.com/external-secrets/external-secrets/pkg/template"
 	utils "github.com/external-secrets/external-secrets/pkg/utils"
 )
 
@@ -34,12 +35,15 @@ import (
 // * template.Data (highest precedence)
 // * template.templateFrom
 // * secret via es.data or es.dataFrom.
-func (r *Reconciler) applyTemplate(ctx context.Context, es *esv1alpha1.ExternalSecret, secret *v1.Secret, dataMap map[string][]byte) error {
+func (r *Reconciler) applyTemplate(ctx context.Context, es *esv1alpha1.ExternalSecret, secret *v1.Secret, dataMap map[string]interface{}) error {
 	mergeMetadata(secret, es)
-
 	// no template: copy data and return
 	if es.Spec.Target.Template == nil {
-		secret.Data = dataMap
+		var data, err = serializer.SerialiseSecret(dataMap, serializer.BytesSecretFormat)
+		if err != nil {
+			return fmt.Errorf(errSerialisation, err)
+		}
+		secret.Data = data
 		secret.Annotations[esv1alpha1.AnnotationDataHash] = utils.ObjectHash(secret.Data)
 		return nil
 	}
@@ -56,7 +60,7 @@ func (r *Reconciler) applyTemplate(ctx context.Context, es *esv1alpha1.ExternalS
 	}
 	r.Log.V(1).Info("found template data", "tpl_data", tplMap)
 
-	err = template.Execute(tplMap, dataMap, secret)
+	err = template.Execute(tplMap, dataMap, secret, es.Spec.Target.Template.Version)
 	if err != nil {
 		return fmt.Errorf(errExecTpl, err)
 	}
@@ -64,9 +68,21 @@ func (r *Reconciler) applyTemplate(ctx context.Context, es *esv1alpha1.ExternalS
 	// if no data was provided by template fallback
 	// to value from the provider
 	if len(es.Spec.Target.Template.Data) == 0 {
-		for k, v := range dataMap {
-			secret.Data[k] = v
+		var data map[string][]byte
+		var err error
+		switch es.Spec.Target.Template.Version {
+		case esv1alpha1.ExternalSecretTemplateVersionV1:
+			data, err = serializer.SerialiseSecret(dataMap, serializer.BytesSecretFormat)
+			if err != nil {
+				return fmt.Errorf(errSerialisation, err)
+			}
+		case esv1alpha1.ExternalSecretTemplateVersionV2:
+			data, err = serializer.SerialiseSecret(dataMap, serializer.JsonBytesSecretFormat)
+			if err != nil {
+				return fmt.Errorf(errSerialisation, err)
+			}
 		}
+		secret.Data = data
 	}
 	secret.Annotations[esv1alpha1.AnnotationDataHash] = utils.ObjectHash(secret.Data)
 

@@ -11,6 +11,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package lockbox
 
 import (
@@ -198,7 +199,7 @@ type lockboxSecretsClient struct {
 }
 
 // GetSecret returns a single secret from the provider.
-func (c *lockboxSecretsClient) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) ([]byte, error) {
+func (c *lockboxSecretsClient) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (interface{}, error) {
 	entries, err := c.lockboxClient.GetPayloadEntries(ctx, c.iamToken, ref.Key, ref.Version)
 	if err != nil {
 		return nil, fmt.Errorf("unable to request secret payload to get secret: %w", err)
@@ -213,28 +214,24 @@ func (c *lockboxSecretsClient) GetSecret(ctx context.Context, ref esv1alpha1.Ext
 			}
 			keyToValue[entry.Key] = value
 		}
-		out, err := json.Marshal(keyToValue)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal secret: %w", err)
-		}
-		return out, nil
+		return keyToValue, nil
 	}
 
 	entry, err := findEntryByKey(entries, ref.Property)
 	if err != nil {
 		return nil, err
 	}
-	return getValueAsBinary(entry)
+	return getValueAsIs(entry)
 }
 
 // GetSecretMap returns multiple k/v pairs from the provider.
-func (c *lockboxSecretsClient) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string][]byte, error) {
+func (c *lockboxSecretsClient) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string]interface{}, error) {
 	entries, err := c.lockboxClient.GetPayloadEntries(ctx, c.iamToken, ref.Key, ref.Version)
 	if err != nil {
 		return nil, fmt.Errorf("unable to request secret payload to get secret map: %w", err)
 	}
 
-	secretMap := make(map[string][]byte, len(entries))
+	secretMap := make(map[string]interface{}, len(entries))
 	for _, entry := range entries {
 		value, err := getValueAsBinary(entry)
 		if err != nil {

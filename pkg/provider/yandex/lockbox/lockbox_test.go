@@ -15,7 +15,6 @@ package lockbox
 
 import (
 	"context"
-	b64 "encoding/base64"
 	"encoding/json"
 	"testing"
 	"time"
@@ -118,11 +117,11 @@ func TestGetSecretForAllEntries(t *testing.T) {
 
 	tassert.Equal(
 		t,
-		map[string]string{
+		map[string]interface{}{
 			k1: v1,
-			k2: base64(v2),
+			k2: v2,
 		},
-		unmarshalStringMap(t, data),
+		data,
 	)
 }
 
@@ -153,8 +152,7 @@ func TestGetSecretForTextEntry(t *testing.T) {
 	tassert.Nil(t, err)
 	data, err := secretsClient.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID, Property: k1})
 	tassert.Nil(t, err)
-
-	tassert.Equal(t, v1, string(data))
+	tassert.Equal(t, v1, data)
 }
 
 func TestGetSecretForBinaryEntry(t *testing.T) {
@@ -214,7 +212,7 @@ func TestGetSecretByVersionID(t *testing.T) {
 	data, err := secretsClient.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID, Version: oldVersionID})
 	tassert.Nil(t, err)
 
-	tassert.Equal(t, map[string]string{oldKey: oldVal}, unmarshalStringMap(t, data))
+	tassert.Equal(t, map[string]interface{}{oldKey: oldVal}, data)
 
 	newKey, newVal := "newKey", "newVal"
 	newVersionID := lockboxBackend.AddVersion(secretID,
@@ -223,11 +221,11 @@ func TestGetSecretByVersionID(t *testing.T) {
 
 	data, err = secretsClient.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID, Version: oldVersionID})
 	tassert.Nil(t, err)
-	tassert.Equal(t, map[string]string{oldKey: oldVal}, unmarshalStringMap(t, data))
+	tassert.Equal(t, map[string]interface{}{oldKey: oldVal}, data)
 
 	data, err = secretsClient.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID, Version: newVersionID})
 	tassert.Nil(t, err)
-	tassert.Equal(t, map[string]string{newKey: newVal}, unmarshalStringMap(t, data))
+	tassert.Equal(t, map[string]interface{}{newKey: newVal}, data)
 }
 
 func TestGetSecretUnauthorized(t *testing.T) {
@@ -322,7 +320,7 @@ func TestGetSecretWithTwoNamespaces(t *testing.T) {
 	tassert.Nil(t, err)
 
 	data, err := secretsClient1.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID1, Property: k1})
-	tassert.Equal(t, v1, string(data))
+	tassert.Equal(t, v1, data)
 	tassert.Nil(t, err)
 	data, err = secretsClient1.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID2, Property: k2})
 	tassert.Nil(t, data)
@@ -332,7 +330,7 @@ func TestGetSecretWithTwoNamespaces(t *testing.T) {
 	tassert.Nil(t, data)
 	tassert.EqualError(t, err, errSecretPayloadPermissionDenied)
 	data, err = secretsClient2.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID2, Property: k2})
-	tassert.Equal(t, v2, string(data))
+	tassert.Equal(t, v2, data)
 	tassert.Nil(t, err)
 }
 
@@ -380,10 +378,10 @@ func TestGetSecretWithTwoApiEndpoints(t *testing.T) {
 	secretsClient2, err := provider2.NewClient(ctx, store2, k8sClient, namespace)
 	tassert.Nil(t, err)
 
-	var data []byte
+	var data interface{}
 
 	data, err = secretsClient1.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID1, Property: k1})
-	tassert.Equal(t, v1, string(data))
+	tassert.Equal(t, v1, data)
 	tassert.Nil(t, err)
 	data, err = secretsClient1.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID2, Property: k2})
 	tassert.Nil(t, data)
@@ -393,7 +391,7 @@ func TestGetSecretWithTwoApiEndpoints(t *testing.T) {
 	tassert.Nil(t, data)
 	tassert.EqualError(t, err, errSecretPayloadNotFound)
 	data, err = secretsClient2.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID2, Property: k2})
-	tassert.Equal(t, v2, string(data))
+	tassert.Equal(t, v2, data)
 	tassert.Nil(t, err)
 }
 
@@ -420,12 +418,12 @@ func TestGetSecretWithIamTokenExpiration(t *testing.T) {
 		Backend: lockboxBackend,
 	})
 
-	var data []byte
+	var data interface{}
 
 	oldSecretsClient, err := provider.NewClient(ctx, store, k8sClient, namespace)
 	tassert.Nil(t, err)
 	data, err = oldSecretsClient.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID, Property: k1})
-	tassert.Equal(t, v1, string(data))
+	tassert.Equal(t, v1, data)
 	tassert.Nil(t, err)
 
 	lockboxBackend.AdvanceClock(2 * tokenExpirationTime)
@@ -437,7 +435,7 @@ func TestGetSecretWithIamTokenExpiration(t *testing.T) {
 	newSecretsClient, err := provider.NewClient(ctx, store, k8sClient, namespace)
 	tassert.Nil(t, err)
 	data, err = newSecretsClient.GetSecret(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID, Property: k1})
-	tassert.Equal(t, v1, string(data))
+	tassert.Equal(t, v1, data)
 	tassert.Nil(t, err)
 }
 
@@ -549,7 +547,7 @@ func TestGetSecretMap(t *testing.T) {
 
 	tassert.Equal(
 		t,
-		map[string][]byte{
+		map[string]interface{}{
 			k1: []byte(v1),
 			k2: v2,
 		},
@@ -583,7 +581,7 @@ func TestGetSecretMapByVersionID(t *testing.T) {
 	data, err := secretsClient.GetSecretMap(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID, Version: oldVersionID})
 	tassert.Nil(t, err)
 
-	tassert.Equal(t, map[string][]byte{oldKey: []byte(oldVal)}, data)
+	tassert.Equal(t, map[string]interface{}{oldKey: []byte(oldVal)}, data)
 
 	newKey, newVal := "newKey", "newVal"
 	newVersionID := lockboxBackend.AddVersion(secretID,
@@ -592,11 +590,11 @@ func TestGetSecretMapByVersionID(t *testing.T) {
 
 	data, err = secretsClient.GetSecretMap(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID, Version: oldVersionID})
 	tassert.Nil(t, err)
-	tassert.Equal(t, map[string][]byte{oldKey: []byte(oldVal)}, data)
+	tassert.Equal(t, map[string]interface{}{oldKey: []byte(oldVal)}, data)
 
 	data, err = secretsClient.GetSecretMap(ctx, esv1alpha1.ExternalSecretDataRemoteRef{Key: secretID, Version: newVersionID})
 	tassert.Nil(t, err)
-	tassert.Equal(t, map[string][]byte{newKey: []byte(newVal)}, data)
+	tassert.Equal(t, map[string]interface{}{newKey: []byte(newVal)}, data)
 }
 
 // helper functions
@@ -669,15 +667,4 @@ func binaryEntry(key string, value []byte) *lockbox.Payload_Entry {
 			BinaryValue: value,
 		},
 	}
-}
-
-func unmarshalStringMap(t *testing.T, data []byte) map[string]string {
-	stringMap := make(map[string]string)
-	err := json.Unmarshal(data, &stringMap)
-	tassert.Nil(t, err)
-	return stringMap
-}
-
-func base64(data []byte) string {
-	return b64.StdEncoding.EncodeToString(data)
 }

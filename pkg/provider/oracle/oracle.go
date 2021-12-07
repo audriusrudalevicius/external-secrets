@@ -13,9 +13,8 @@ package oracle
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-
+	"github.com/external-secrets/external-secrets/pkg/serializer"
 	"github.com/oracle/oci-go-sdk/v45/common"
 	vault "github.com/oracle/oci-go-sdk/v45/vault"
 	"github.com/tidwall/gjson"
@@ -45,7 +44,6 @@ const (
 	errMissingTenancy                        = "missing Tenancy ID"
 	errMissingRegion                         = "missing Region"
 	errMissingFingerprint                    = "missing Fingerprint"
-	errJSONSecretUnmarshal                   = "unable to unmarshal secret: %w"
 	errMissingKey                            = "missing Key in secret: %s"
 	errInvalidSecret                         = "invalid secret received. no secret string nor binary for key: %s"
 )
@@ -122,53 +120,49 @@ func (c *client) setAuth(ctx context.Context) error {
 	return nil
 }
 
-func (vms *VaultManagementService) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) ([]byte, error) {
+func (vms *VaultManagementService) readSecret(ctx context.Context, id, path string) ([]byte, error) {
 	if utils.IsNil(vms.Client) {
 		return nil, fmt.Errorf(errUninitalizedOracleProvider)
 	}
 	vmsRequest := vault.GetSecretRequest{
-		SecretId: &ref.Key,
+		SecretId: &id,
 	}
-	secretOut, err := vms.Client.GetSecret(context.Background(), vmsRequest)
+	secretOut, err := vms.Client.GetSecret(ctx, vmsRequest)
 	if err != nil {
 		return nil, util.SanitizeErr(err)
 	}
-	if ref.Property == "" {
+	if path == "" {
 		if *secretOut.SecretName != "" {
 			return []byte(*secretOut.SecretName), nil
 		}
-		return nil, fmt.Errorf(errInvalidSecret, ref.Key)
+		return nil, fmt.Errorf(errInvalidSecret, id)
 	}
 	var payload *string
 	if secretOut.SecretName != nil {
 		payload = secretOut.SecretName
 	}
-
 	payloadval := *payload
-
-	val := gjson.Get(payloadval, ref.Property)
+	val := gjson.Get(payloadval, path)
 	if !val.Exists() {
-		return nil, fmt.Errorf(errMissingKey, ref.Key)
+		return nil, fmt.Errorf(errMissingKey, id)
 	}
-
 	return []byte(val.String()), nil
 }
 
-func (vms *VaultManagementService) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string][]byte, error) {
-	data, err := vms.GetSecret(ctx, ref)
+func (vms *VaultManagementService) GetSecret(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (interface{}, error) {
+	val, err := vms.readSecret(context.Background(), ref.Key, ref.Property)
 	if err != nil {
 		return nil, err
 	}
-	kv := make(map[string]string)
-	err = json.Unmarshal(data, &kv)
+	return val, nil
+}
+
+func (vms *VaultManagementService) GetSecretMap(ctx context.Context, ref esv1alpha1.ExternalSecretDataRemoteRef) (map[string]interface{}, error) {
+	data, err := vms.readSecret(context.Background(), ref.Key, ref.Property)
 	if err != nil {
-		return nil, fmt.Errorf(errJSONSecretUnmarshal, err)
+		return nil, err
 	}
-	secretData := make(map[string][]byte)
-	for k, v := range kv {
-		secretData[k] = []byte(v)
-	}
-	return secretData, nil
+	return serializer.UnmarshalJson(data)
 }
 
 // NewClient constructs a new secrets client based on the provided store.
